@@ -63,12 +63,10 @@
   </div>
 </div>
 
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
-  // FIREBASE CONFIG
   const firebaseConfig = {
     apiKey: "AIzaSyADt9HgnrXmlk7szO75ubt28LTnpma0lSc",
     authDomain: "projectfriend-5a223.firebaseapp.com",
@@ -84,7 +82,7 @@
   const messagesRef = db.ref("messages");
 
   let currentUser = "";
-  let attempts = 3; // 3 şans
+  let attempts = 3;
 
   // LOGIN
   function login() {
@@ -115,22 +113,22 @@
     document.getElementById("chat").style.display = "block";
   }
 
-  // MESAJ GÖNDƏR
   function sendMessage() {
     const msgInput = document.getElementById("message");
     const text = msgInput.value.trim();
     if (!text) return;
 
+    // Yalnız yeni mesaj göndər
     messagesRef.push({
       user: currentUser,
       text: text,
-      time: Date.now()
+      time: Date.now(),
+      visibleTo: currentUser // mesaj yalnız digərləri üçün görünəcək
     });
 
     msgInput.value = "";
   }
 
-  // ENTER ilə göndər
   function handleEnter(e) {
     if (e.key === "Enter") sendMessage();
   }
@@ -140,12 +138,14 @@
     const data = snapshot.val();
     const chatBox = document.getElementById("chatBox");
 
-    const div = document.createElement("div");
-    div.className = "msg";
-    div.innerHTML = `<span class=\"user\">${data.user}:</span> ${data.text}`;
-
-    chatBox.appendChild(div);
-    chatBox.scrollTop = chatBox.scrollHeight;
+    // yalnız digərləri üçün mesajı göstər
+    if (data.user !== currentUser) {
+      const div = document.createElement("div");
+      div.className = "msg";
+      div.innerHTML = `<span class=\"user\">${data.user}:</span> ${data.text}`;
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
   });
 </script>
 
