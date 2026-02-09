@@ -161,7 +161,7 @@ function login(){
 function start(){
   loginBox.style.display="none";
   app.style.display="flex";
-  if(currentRole==="admin") adminBtn.style.display="inline";
+  refreshAdminBtn();
   db.ref("users/"+currentUser+"/online").set(true);
   loadUsers();
   listenMessages();
@@ -211,6 +211,24 @@ function listenMessages(){
       </div>
     </div>`;
     messagesBox.scrollTop=messagesBox.scrollHeight;
+    db.ref("messages").on("child_removed", s=>{
+  const el = document.getElementById("msg_"+s.key);
+  if(el) el.remove();
+});
+
+
+  // avatar update listener
+  db.ref("users").on("child_changed",snap=>{
+    const uid=snap.key;
+    const avatar=snap.val().avatar;
+    document.querySelectorAll(`.msg img`).forEach(img=>{
+      if(img.parentElement.querySelector("b").innerText===uid){
+        img.src=avatar||'https://i.imgur.com/6VBx3io.png';
+      }
+    });
+    if(uid===currentUser){
+      refreshAdminBtn(); // role dəyişikdirsə dərhal refresh
+    }
   });
 }
 
@@ -241,10 +259,9 @@ function toggleAdmin(){
 }
 
 function deleteUser(){
-  const u=deleteUserInput.value;
+  const u=deleteUserInput.value.trim();
   if(!u) return;
-  db.ref("users/"+u+"/deleted").set(true);
-  db.ref("users/"+u+"/online").set(false);
+  db.ref("users/"+u).remove(); // silindikdə eyni adı yaratmaq olur
 }
 
 function createUser(){
@@ -277,10 +294,18 @@ function toggleAdminRole(){
     if(s.exists() && s.val()==="admin"){
       db.ref("users/"+u+"/role").set("user");
       adminError.innerText=`${u} artıq user oldu`;
+      if(u===currentUser) refreshAdminBtn(); // özümüzü geri user edəndə admin xüsusiyyətləri silinir
     } else {
       db.ref("users/"+u+"/role").set("admin");
       adminError.innerText=`${u} artıq admin oldu`;
     }
+  });
+}
+
+function refreshAdminBtn(){
+  db.ref("users/"+currentUser+"/role").get().then(s=>{
+    currentRole = s.val()||"user";
+    adminBtn.style.display = currentRole==="admin"?"inline":"none";
   });
 }
 
@@ -290,10 +315,6 @@ function logout(){
   location.reload();
 }
 </script>
-
-</body>
-</html>
-
 
 </body>
 </html>
