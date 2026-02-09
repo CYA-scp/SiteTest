@@ -3,50 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <title>Private Chat</title>
-
 <style>
 *{box-sizing:border-box}
-body{
-  margin:0;
-  background:#1e1f22;
-  font-family:Arial;
-  color:#dcddde;
-  height:100vh;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-}
+body{margin:0;background:#1e1f22;font-family:Arial;color:#dcddde;height:100vh;display:flex;justify-content:center;align-items:center}
 .fade{animation:fade .3s}
 @keyframes fade{from{opacity:0;transform:scale(.96)}to{opacity:1}}
-
 input.error{border:1px solid #ed4245}
 .error-text{color:#ed4245;font-size:13px;margin-top:4px}
-
-.login,.settings,.admin{
-  background:#313338;
-  padding:20px;
-  border-radius:8px;
-  width:320px;
-}
-
-.login input,.settings input,.admin input,button{
-  width:100%;
-  margin-top:8px;
-  padding:8px;
-}
-
+.login,.settings,.admin{background:#313338;padding:20px;border-radius:8px;width:320px}
+.login input,.settings input,.admin input,button{width:100%;margin-top:8px;padding:8px}
 button{background:#5865f2;color:white;border:none;cursor:pointer}
-
-.app{
-  width:1000px;height:560px;
-  background:#313338;
-  border-radius:10px;
-  display:none;
-  overflow:hidden;
-}
-.sidebar{
-  width:260px;background:#2b2d31;padding:10px;
-}
+.app{width:1000px;height:560px;background:#313338;border-radius:10px;display:none;overflow:hidden}
+.sidebar{width:260px;background:#2b2d31;padding:10px}
 .chat{flex:1;display:flex;flex-direction:column}
 .messages{flex:1;padding:10px;overflow-y:auto}
 .msg{display:flex;margin-bottom:8px}
@@ -57,23 +25,11 @@ button{background:#5865f2;color:white;border:none;cursor:pointer}
 .user img{width:32px;height:32px;border-radius:50%;margin-right:6px}
 .tag{color:#22c55e;font-size:12px}
 .online{color:#22c55e}.offline{color:#ef4444}
-
-.settings,.admin{
-  position:absolute;
-  left:20px;
-  top:20px;
-  display:none;
-}
+.settings,.admin{position:absolute;left:20px;top:20px;display:none}
 .red{background:#ed4245}
-.edit-btn{
-  color:#facc15;
-  cursor:pointer;
-  margin-left:6px;
-  font-size:12px;
-}
+.edit-btn{color:#facc15;cursor:pointer;margin-left:6px;font-size:12px}
 </style>
 </head>
-
 <body>
 
 <div class="login fade" id="loginBox">
@@ -91,12 +47,10 @@ button{background:#5865f2;color:white;border:none;cursor:pointer}
     <span onclick="toggleAdmin()" id="adminBtn" style="cursor:pointer;display:none">👑</span>
     <div id="userList"></div>
   </div>
-
   <div class="chat">
     <div class="messages" id="messagesBox"></div>
     <div class="input">
-      <input id="msgInput" placeholder="Mesaj yaz..."
-        onkeydown="if(event.key==='Enter')sendMessage()">
+      <input id="msgInput" placeholder="Mesaj yaz..." onkeydown="if(event.key==='Enter')sendMessage()">
       <button onclick="sendMessage()">Göndər</button>
     </div>
   </div>
@@ -117,49 +71,48 @@ button{background:#5865f2;color:white;border:none;cursor:pointer}
 
 <div class="admin fade" id="adminPanel">
   <b>Admin Panel</b>
-
   <input id="deleteUserInput" placeholder="Username sil">
   <button class="red" onclick="deleteUser()">Sil</button>
-
   <hr>
-
   <b>User yarat</b>
   <input id="newUsername" placeholder="username">
   <input id="newPassword" type="password" placeholder="password">
   <button onclick="createUser()">Yarat!</button>
-
   <hr>
-
   <b>Admin Et / Geri User Et</b>
   <input id="makeAdminInput" placeholder="Username admin et/al">
   <button onclick="toggleAdminRole()">Toggle Admin</button>
-
   <div id="adminError" class="error-text"></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
 <script>
 firebase.initializeApp({
   apiKey:"AIzaSyC4t6Cu-q8iIHGy3V5g-Q14s3qnwsnfRKU",
   databaseURL:"https://projectchat-bcb6e-default-rtdb.firebaseio.com"
 });
 const db=firebase.database();
-
-let currentUser=null;
-let currentRole="user";
+let currentUser=null,currentRole="user";
 
 /* LOGIN */
 function login(){
   loginError.innerText="";
-  db.ref("users/"+luser.value).get().then(s=>{
-    if(!s.exists() || s.val().password!==lpass.value){
-      loginError.innerText="Username və ya şifrə yanlışdır";
+  const u=luser.value.trim(),p=lpass.value.trim();
+  if(!u||!p) return;
+  db.ref("users/"+u).get().then(s=>{
+    if(!s.exists()){
+      loginError.innerText="User mövcud deyil"; return;
+    }
+    const user=s.val();
+    if(user.loginAttempts===0){ loginError.innerText="Limit bitib"; return;}
+    if(user.password!==p){
+      db.ref("users/"+u+"/loginAttempts").set((user.loginAttempts||3)-1);
+      loginError.innerText=`Şifrə səhvdir! Qalıb ${(user.loginAttempts||3)-1} giriş`;
       return;
     }
-    currentUser=luser.value;
-    currentRole=s.val().role||"user";
+    currentUser=u;
+    currentRole=user.role||"user";
     start();
   });
 }
@@ -179,12 +132,10 @@ function loadUsers(){
     userList.innerHTML="";
     s.forEach(u=>{
       if(u.val().deleted) return;
-      let rank = u.val().role==="admin"?"👑":"👤";
-      userList.innerHTML+=`
-      <div class="user">
+      let rank=u.val().role==="admin"?"👑":"👤";
+      userList.innerHTML+=`<div class="user">
         <img src="${u.val().avatar||'https://i.imgur.com/6VBx3io.png'}">
-        ${rank} ${u.key}
-        ${u.val().tag?`<span class="tag">(${u.val().tag})</span>`:""}
+        ${rank} ${u.key} ${u.val().tag?`<span class="tag">(${u.val().tag})</span>`:""}
         <span class="${u.val().online?'online':'offline'}">●</span>
       </div>`;
     });
@@ -198,7 +149,7 @@ function sendMessage(){
     user:currentUser,
     text:msgInput.value,
     owner:currentUser,
-    avatar: document.getElementById("avatarUrl").value || 'https://i.imgur.com/6VBx3io.png'
+    avatar: document.getElementById("avatarUrl").value||'https://i.imgur.com/6VBx3io.png'
   });
   msgInput.value="";
 }
@@ -208,13 +159,10 @@ function listenMessages(){
     const m=s.val();
     const canEdit = (m.owner===currentUser || currentRole==="admin");
     const canDelete = canEdit;
-
-    messagesBox.innerHTML+=`
-    <div class="msg" id="msg_${s.key}">
+    messagesBox.innerHTML+=`<div class="msg" id="msg_${s.key}">
       <img src="${m.avatar||'https://i.imgur.com/6VBx3io.png'}">
       <div>
-        <b>${m.user}</b>: 
-        <span id="text_${s.key}">${m.text}</span>
+        <b>${m.user}</b>: <span id="text_${s.key}">${m.text}</span>
         ${canDelete?`<span style="color:#ed4245;cursor:pointer" onclick="deleteMsg('${s.key}')"> ✖</span>`:""}
         ${canEdit?`<span class="edit-btn" onclick="editMsg('${s.key}')">✎</span>`:""}
       </div>
@@ -222,115 +170,60 @@ function listenMessages(){
     messagesBox.scrollTop=messagesBox.scrollHeight;
   });
 
-  // avatar update listener
   db.ref("users").on("child_changed",snap=>{
-    const uid=snap.key;
-    const avatar=snap.val().avatar;
-    document.querySelectorAll(`.msg`).forEach(div=>{
-      if(div.querySelector("b").innerText===uid){
-        div.querySelector("img").src = avatar||'https://i.imgur.com/6VBx3io.png';
-      }
+    const uid=snap.key,avatar=snap.val().avatar;
+    document.querySelectorAll(".msg").forEach(div=>{
+      if(div.querySelector("b").innerText===uid) div.querySelector("img").src=avatar||'https://i.imgur.com/6VBx3io.png';
     });
     if(uid===currentUser) refreshAdminBtn();
   });
 
-  // message remove listener
   db.ref("messages").on("child_removed", s=>{
-    const el = document.getElementById("msg_"+s.key);
-    if(el) el.remove();
+    const el=document.getElementById("msg_"+s.key); if(el) el.remove();
   });
 }
 
-function deleteMsg(id){
-  db.ref("messages/"+id).remove();
-}
-
+function deleteMsg(id){ db.ref("messages/"+id).remove(); }
 function editMsg(id){
-  const span = document.getElementById("text_"+id);
-  const oldText = span.innerText;
-  const newText = prompt("Mesajı redaktə et:", oldText);
-  if(newText!==null && newText.trim()!==""){
-    db.ref("messages/"+id+"/text").set(newText);
-  }
+  const span=document.getElementById("text_"+id);
+  const oldText=span.innerText;
+  const newText=prompt("Mesajı redaktə et:",oldText);
+  if(newText!==null && newText.trim()!=="") db.ref("messages/"+id+"/text").set(newText);
 }
 
 /* SETTINGS */
-function toggleSettings(){
-  settings.style.display=settings.style.display==="block"?"none":"block";
-}
-function togglePassword(){
-  passBox.style.display=passBox.style.display==="none"?"block":"none";
-}
+function toggleSettings(){ settings.style.display=settings.style.display==="block"?"none":"block"; }
+function togglePassword(){ passBox.style.display=passBox.style.display==="none"?"block":"none"; }
 function saveSettings(){
   if(tagInput.value.length>7) return;
   db.ref("users/"+currentUser+"/tag").set(tagInput.value);
-  if(avatarUrl.value)
-    db.ref("users/"+currentUser+"/avatar").set(avatarUrl.value);
+  if(avatarUrl.value) db.ref("users/"+currentUser+"/avatar").set(avatarUrl.value);
   settings.style.display="none";
 }
 
 /* ADMIN */
-function toggleAdmin(){
-  adminPanel.style.display=adminPanel.style.display==="block"?"none":"block";
-}
-
-function deleteUser(){
-  const u=deleteUserInput.value.trim();
-  if(!u) return;
-  db.ref("users/"+u).remove();
-}
-
+function toggleAdmin(){ adminPanel.style.display=adminPanel.style.display==="block"?"none":"block"; }
+function deleteUser(){ const u=deleteUserInput.value.trim(); if(!u) return; db.ref("users/"+u).remove(); }
 function createUser(){
-  const u=newUsername.value.trim();
-  const p=newPassword.value.trim();
-  if(!u||!p){
-    adminError.innerText="Boş buraxma";
-    return;
-  }
+  const u=newUsername.value.trim(),p=newPassword.value.trim();
+  if(!u||!p){ adminError.innerText="Boş buraxma"; return; }
   db.ref("users/"+u).get().then(s=>{
-    if(s.exists()){
-      adminError.innerText="User artıq var";
-      return;
-    }
-    db.ref("users/"+u).set({
-      password:p,
-      role:"user",
-      online:false
-    });
-    adminError.innerText="User yaradıldı ✔";
-    newUsername.value="";
-    newPassword.value="";
+    if(s.exists()){ adminError.innerText="User artıq var"; return; }
+    db.ref("users/"+u).set({password:p,role:"user",online:false,loginAttempts:3});
+    adminError.innerText="User yaradıldı ✔"; newUsername.value=""; newPassword.value="";
   });
 }
-
 function toggleAdminRole(){
-  const u = makeAdminInput.value.trim();
-  if(!u) return;
+  const u=makeAdminInput.value.trim(); if(!u) return;
   db.ref("users/"+u+"/role").get().then(s=>{
-    if(s.exists() && s.val()==="admin"){
-      db.ref("users/"+u+"/role").set("user");
-      adminError.innerText=`${u} artıq user oldu`;
-      if(u===currentUser) refreshAdminBtn();
-    } else {
-      db.ref("users/"+u+"/role").set("admin");
-      adminError.innerText=`${u} artıq admin oldu`;
-    }
+    if(s.exists() && s.val()==="admin"){ db.ref("users/"+u+"/role").set("user"); adminError.innerText=`${u} artıq user oldu`; if(u===currentUser) refreshAdminBtn(); }
+    else{ db.ref("users/"+u+"/role").set("admin"); adminError.innerText=`${u} artıq admin oldu`; }
   });
 }
-
-function refreshAdminBtn(){
-  db.ref("users/"+currentUser+"/role").get().then(s=>{
-    currentRole = s.val()||"user";
-    adminBtn.style.display = currentRole==="admin"?"inline":"none";
-  });
-}
+function refreshAdminBtn(){ db.ref("users/"+currentUser+"/role").get().then(s=>{ currentRole=s.val()||"user"; adminBtn.style.display=currentRole==="admin"?"inline":"none"; }); }
 
 /* LOGOUT */
-function logout(){
-  db.ref("users/"+currentUser+"/online").set(false);
-  location.reload();
-}
+function logout(){ db.ref("users/"+currentUser+"/online").set(false); location.reload(); }
 </script>
-
 </body>
 </html>
