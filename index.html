@@ -124,9 +124,9 @@ button{background:#5865f2;color:white;border:none;cursor:pointer}
 
   <hr>
 
-  <b>Admin et</b>
-  <input id="makeAdminInput" placeholder="Username admin et">
-  <button onclick="makeAdmin()">Admin et</button>
+  <b>Admin Et / Geri User Et</b>
+  <input id="makeAdminInput" placeholder="Username admin et/al">
+  <button onclick="toggleAdminRole()">Toggle Admin</button>
 
   <div id="adminError" class="error-text"></div>
 </div>
@@ -173,10 +173,11 @@ function loadUsers(){
     userList.innerHTML="";
     s.forEach(u=>{
       if(u.val().deleted) return;
+      let rank = u.val().role==="admin"?"👑":"👤";
       userList.innerHTML+=`
       <div class="user">
         <img src="${u.val().avatar||'https://i.imgur.com/6VBx3io.png'}">
-        ${u.key}
+        ${rank} ${u.key}
         ${u.val().tag?`<span class="tag">(${u.val().tag})</span>`:""}
         <span class="${u.val().online?'online':'offline'}">●</span>
       </div>`;
@@ -190,7 +191,8 @@ function sendMessage(){
   db.ref("messages").push({
     user:currentUser,
     text:msgInput.value,
-    owner:currentUser
+    owner:currentUser,
+    avatar: document.getElementById("avatarUrl").value || 'https://i.imgur.com/6VBx3io.png'
   });
   msgInput.value="";
 }
@@ -201,7 +203,7 @@ function listenMessages(){
     const canDelete=(m.owner===currentUser||currentRole==="admin");
     messagesBox.innerHTML+=`
     <div class="msg" id="msg_${s.key}">
-      <img src="https://i.imgur.com/6VBx3io.png">
+      <img src="${m.avatar||'https://i.imgur.com/6VBx3io.png'}">
       <div>
         <b>${m.user}</b>: ${m.text}
         ${canDelete?`<span style="color:#ed4245;cursor:pointer"
@@ -268,11 +270,18 @@ function createUser(){
   });
 }
 
-function makeAdmin(){
-  const u=makeAdminInput.value.trim();
+function toggleAdminRole(){
+  const u = makeAdminInput.value.trim();
   if(!u) return;
-  db.ref("users/"+u+"/role").set("admin");
-  adminError.innerText="Admin edildi 👑";
+  db.ref("users/"+u+"/role").get().then(s=>{
+    if(s.exists() && s.val()==="admin"){
+      db.ref("users/"+u+"/role").set("user");
+      adminError.innerText=`${u} artıq user oldu`;
+    } else {
+      db.ref("users/"+u+"/role").set("admin");
+      adminError.innerText=`${u} artıq admin oldu`;
+    }
+  });
 }
 
 /* LOGOUT */
