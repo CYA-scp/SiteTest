@@ -13,20 +13,30 @@ body{
 input,button{width:100%;padding:10px;margin-top:8px;border-radius:6px;border:none}
 button{background:#22c55e;font-weight:bold;cursor:pointer}
 #chatBox{
-  height:200px;background:#020617;border:1px solid #1e293b;
+  height:220px;background:#020617;border:1px solid #1e293b;
   margin-top:10px;overflow-y:auto;padding:10px
 }
-.msg{margin-bottom:6px}
-.user{color:#facc15;font-weight:bold}
-.me{color:#22c55e}
-#adminPanel{border-top:1px solid #1e293b;margin-top:12px;padding-top:10px}
+.msg{
+  margin-bottom:6px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.name{font-weight:bold}
+.text{margin-left:6px}
+.trash{
+  cursor:pointer;
+  color:#ef4444;
+  margin-left:8px;
+  font-size:14px;
+}
 </style>
 </head>
 
 <body>
 
 <div class="box">
-<h3 id="title">🔐 Gizli Chat Girişi</h3>
+<h3 id="title">🔐 Gizli Chat</h3>
 
 <input id="username" placeholder="Username">
 <input id="password" type="password" placeholder="Parol">
@@ -34,17 +44,9 @@ button{background:#22c55e;font-weight:bold;cursor:pointer}
 
 <div id="chat" style="display:none">
   <div id="chatBox"></div>
-
   <input id="message" placeholder="Mesaj yaz..."
     onkeydown="if(event.key==='Enter')sendMessage()">
   <button onclick="sendMessage()">Göndər</button>
-
-  <div id="adminPanel" style="display:none">
-    <h4>👑 Admin Panel</h4>
-    <input id="newUser" placeholder="Yeni username">
-    <input id="newPass" placeholder="Yeni parol">
-    <button onclick="addUser()">User əlavə et</button>
-  </div>
 </div>
 </div>
 
@@ -52,100 +54,103 @@ button{background:#22c55e;font-weight:bold;cursor:pointer}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
-/* ===================================================
-   ⚙️ AYARLAR – YALNIZ BURANI DƏYİŞ
-=================================================== */
-const CONFIG = {
-  adminUsername: "Huseyn(Qurucu)",
-
-  // ilk userlər (Firebase-ə avtomatik yazılacaq)
-  defaultUsers: {
-    "Huseyn(Qurucu)": "14659445",
-    "Ferit": "12345",
-    "Rahim": "12345"
-  },
-
-  firebase: {
-    apiKey: "AIzaSyC4t6Cu-q8iIHGy3V5g-Q14s3qnwsnfRKU",
-    databaseURL: "https://projectchat-bcb6e-default-rtdb.firebaseio.com"
+/* ===== CONFIG ===== */
+const CONFIG={
+  adminUsername:"Huseyn(Qurucu)",
+  firebase:{
+    apiKey:"AIzaSyC4t6Cu-q8iIHGy3V5g-Q14s3qnwsnfRKU",
+    databaseURL:"https://projectchat-bcb6e-default-rtdb.firebaseio.com"
   }
 };
-/* =================================================== */
 
 firebase.initializeApp(CONFIG.firebase);
-const db = firebase.database();
-let currentUser = "";
+const db=firebase.database();
 
-/* 🔹 DEFAULT USERLARI YARAT (1 DƏFƏ) */
-Object.keys(CONFIG.defaultUsers).forEach(u=>{
-  db.ref("users/"+u).set({ password: CONFIG.defaultUsers[u] });
-});
+let currentUser="";
+let userColors={};
+
+/* 🎨 RANDOM COLOR */
+function getColor(user){
+  if(userColors[user]) return userColors[user];
+  const colors=["#22c55e","#38bdf8","#facc15","#f472b6","#a78bfa","#fb7185"];
+  const c=colors[Math.floor(Math.random()*colors.length)];
+  userColors[user]=c;
+  return c;
+}
 
 /* 🔑 LOGIN */
 function login(){
-  const u = username.value.trim();
-  const p = password.value.trim();
-  if(!u || !p) return alert("Boş buraxma");
+  const u=username.value.trim();
+  const p=password.value.trim();
+  if(!u||!p) return alert("Boş buraxma");
 
   db.ref("users/"+u).get().then(s=>{
-    if(!s.exists()) return alert("User yoxdur ❌");
-    if(s.val().password !== p) return alert("Parol səhvdir ❌");
+    if(!s.exists()) return alert("User yoxdur");
+    if(s.val().password!==p) return alert("Parol səhv");
 
-    currentUser = u;
-    username.style.display = "none";
-    password.style.display = "none";
-    document.querySelector("button").style.display = "none";
-
-    title.innerText = "Xoş gəldin, " + u;
-    chat.style.display = "block";
-
-    if(u === CONFIG.adminUsername){
-      adminPanel.style.display = "block";
-    }
-
+    currentUser=u;
+    username.style.display="none";
+    password.style.display="none";
+    document.querySelector("button").style.display="none";
+    title.innerText="Xoş gəldin, "+u;
+    chat.style.display="block";
     listenMessages();
   });
 }
 
-/* ➕ ADMIN → USER ƏLAVƏ ET */
-function addUser(){
-  const u = newUser.value.trim();
-  const p = newPass.value.trim();
-  if(!u || !p) return alert("Boş buraxma");
-
-  db.ref("users/"+u).set({ password: p });
-  alert("User əlavə olundu ✅");
-  newUser.value = "";
-  newPass.value = "";
-}
-
-/* 📤 MESAJ GÖNDƏR */
+/* 📤 SEND */
 function sendMessage(){
-  const t = message.value.trim();
+  const t=message.value.trim();
   if(!t) return;
 
   db.ref("messages").push({
-    user: currentUser,
-    text: t,
-    time: Date.now()
+    user:currentUser,
+    text:t,
+    time:Date.now()
   });
-  message.value = "";
+  message.value="";
+}
+
+/* 🗑️ DELETE MESSAGE */
+function deleteMessage(id){
+  db.ref("messages/"+id).remove();
 }
 
 /* 📥 REAL-TIME */
 function listenMessages(){
-  chatBox.innerHTML = "";
-  db.ref("messages").limitToLast(100)
-    .on("child_added", s=>{
-      const m = s.val();
-      const d = document.createElement("div");
-      d.className = "msg";
-      d.innerHTML =
-        `<span class="user ${m.user===currentUser?'me':''}">
-         ${m.user}:</span> ${m.text}`;
-      chatBox.appendChild(d);
-      chatBox.scrollTop = chatBox.scrollHeight;
-    });
+  chatBox.innerHTML="";
+  db.ref("messages").on("child_added",s=>{
+    const m=s.val();
+    const id=s.key;
+
+    const div=document.createElement("div");
+    div.className="msg";
+
+    const left=document.createElement("div");
+    left.innerHTML=
+      `<span class="name" style="color:${getColor(m.user)}">
+       ${m.user}:</span>
+       <span class="text">${m.text}</span>`;
+
+    div.appendChild(left);
+
+    if(m.user===currentUser){
+      const trash=document.createElement("span");
+      trash.className="trash";
+      trash.innerText="🗑️";
+      trash.onclick=()=>deleteMessage(id);
+      div.appendChild(trash);
+    }
+
+    div.id=id;
+    chatBox.appendChild(div);
+    chatBox.scrollTop=chatBox.scrollHeight;
+  });
+
+  db.ref("messages").on("child_removed",s=>{
+    const el=document.getElementById(s.key);
+    if(el) el.remove();
+  });
 }
 </script>
 
