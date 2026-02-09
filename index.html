@@ -6,90 +6,44 @@
 
 <style>
 body{
-  margin:0;
-  background:#1e1f22;
-  font-family:Arial;
-  color:#dcddde;
-  height:100vh;
-  display:flex;
-  justify-content:center;
-  align-items:center;
+  margin:0;background:#1e1f22;font-family:Arial;color:#dcddde;
+  height:100vh;display:flex;justify-content:center;align-items:center
 }
-.app{
-  width:900px;
-  height:520px;
-  background:#313338;
-  border-radius:8px;
-  display:flex;
-  overflow:hidden;
-}
-.sidebar{
-  width:240px;
-  background:#2b2d31;
-  padding:10px;
-}
-.user{
-  padding:6px;
-  border-radius:4px;
-  cursor:pointer;
-}
+.app{width:900px;height:520px;background:#313338;border-radius:8px;display:flex}
+.sidebar{width:240px;background:#2b2d31;padding:10px}
+.user{padding:6px;border-radius:4px;cursor:pointer}
 .user:hover{background:#3f4147}
-.chat{
-  flex:1;
-  display:flex;
-  flex-direction:column;
+.online{color:#22c55e;font-size:10px}
+.offline{color:#ef4444;font-size:10px}
+.chat{flex:1;display:flex;flex-direction:column}
+.messages{flex:1;padding:10px;overflow-y:auto}
+.msg{margin-bottom:6px;display:flex;justify-content:space-between}
+.trash{cursor:pointer;color:#ed4245}
+.input{padding:10px;background:#383a40;display:flex}
+.input input{flex:1;background:#1e1f22;border:none;color:#fff;padding:8px}
+.input button{margin-left:8px;background:#5865f2;border:none;color:white;padding:8px 14px}
+.login{
+  width:300px;background:#313338;padding:20px;border-radius:8px
 }
-.messages{
-  flex:1;
-  padding:10px;
-  overflow-y:auto;
-}
-.msg{
-  margin-bottom:6px;
-  display:flex;
-  justify-content:space-between;
-}
-.name{font-weight:bold}
-.trash{cursor:pointer;color:#ed4245;margin-left:8px}
-.input{
-  padding:10px;
-  background:#383a40;
-  display:flex;
-}
-.input input{
-  flex:1;
-  background:#1e1f22;
-  border:none;
-  color:#fff;
-  padding:8px;
-  border-radius:4px;
-}
-.input button{
-  margin-left:8px;
-  background:#5865f2;
-  border:none;
-  color:white;
-  padding:8px 14px;
-  border-radius:4px;
-  cursor:pointer;
-}
-.adminPanel{
-  border-top:1px solid #3f4147;
-  padding:8px;
-}
-.adminPanel input, .adminPanel button{
-  width:100%;
-  margin-top:6px;
-  padding:6px;
-}
-.red{background:#ed4245;color:white;border:none}
-.green{background:#22c55e;color:black;border:none}
+.login input{width:100%;margin-bottom:8px;padding:8px}
+.login button{width:100%;padding:8px;background:#5865f2;border:none;color:white}
+.adminPanel{border-top:1px solid #3f4147;padding-top:6px;margin-top:6px}
+.adminPanel input,.adminPanel button{width:100%;margin-top:6px;padding:6px}
 </style>
 </head>
 
 <body>
 
-<div class="app">
+<!-- LOGIN -->
+<div class="login" id="loginBox">
+  <h3>Login</h3>
+  <input id="username" placeholder="Username">
+  <input id="password" type="password" placeholder="Password">
+  <button onclick="login()">Daxil ol</button>
+</div>
+
+<!-- APP -->
+<div class="app" id="app" style="display:none">
 
 <div class="sidebar">
   <h4>Users</h4>
@@ -97,8 +51,8 @@ body{
 
   <div class="adminPanel" id="adminPanel" style="display:none">
     <input id="searchUser" placeholder="User adı">
-    <button class="red" onclick="deleteUser()">User sil</button>
-    <button class="green" onclick="toggleAdmin()">Admin ver / al</button>
+    <button onclick="deleteUser()">User sil</button>
+    <button onclick="toggleAdmin()">Admin ver / al</button>
   </div>
 </div>
 
@@ -117,14 +71,8 @@ body{
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
-/* ===== CONFIG ===== */
 const CONFIG={
   adminUsername:"Huseyn(Qurucu)",
-  defaultUsers:{
-    "Huseyn(Qurucu)":{password:"14659445",role:"admin"},
-    "Ferit":{password:"12345",role:"user"},
-    "Rahim":{password:"12345",role:"user"}
-  },
   firebase:{
     apiKey:"AIzaSyC4t6Cu-q8iIHGy3V5g-Q14s3qnwsnfRKU",
     databaseURL:"https://projectchat-bcb6e-default-rtdb.firebaseio.com"
@@ -134,39 +82,59 @@ const CONFIG={
 firebase.initializeApp(CONFIG.firebase);
 const db=firebase.database();
 
-/* ===== DEFAULT USERS (1 dəfə) ===== */
-Object.keys(CONFIG.defaultUsers).forEach(u=>{
-  db.ref("users/"+u).set(CONFIG.defaultUsers[u]);
-});
+let currentUser="", currentRole="user";
 
-let currentUser=CONFIG.adminUsername;
-let currentRole="admin";
+/* ===== LOGIN ===== */
+function login(){
+  const u=username.value.trim();
+  const p=password.value.trim();
 
-/* ===== USER LIST ===== */
-db.ref("users").on("value",s=>{
-  userList.innerHTML="";
-  s.forEach(u=>{
-    const d=document.createElement("div");
-    d.className="user";
-    d.innerText=u.key+" ("+u.val().role+")";
-    userList.appendChild(d);
+  db.ref("users/"+u).get().then(s=>{
+    if(!s.exists()) return alert("User yoxdur");
+    if(s.val().password!==p) return alert("Parol səhv");
+
+    currentUser=u;
+    currentRole=s.val().role;
+
+    db.ref("users/"+u+"/online").set(true);
+    window.addEventListener("beforeunload",()=>{
+      db.ref("users/"+u+"/online").set(false);
+    });
+
+    loginBox.style.display="none";
+    app.style.display="flex";
+
+    if(currentRole==="admin"){
+      adminPanel.style.display="block";
+    }
+
+    listenUsers();
+    listenMessages();
   });
-});
-
-if(currentRole==="admin"){
-  adminPanel.style.display="block";
 }
 
-/* ===== ADMIN ACTIONS ===== */
+/* ===== ONLINE USERS ===== */
+function listenUsers(){
+  db.ref("users").on("value",s=>{
+    userList.innerHTML="";
+    s.forEach(u=>{
+      const d=document.createElement("div");
+      const on=u.val().online?"online":"offline";
+      d.className="user";
+      d.innerHTML=`${u.key} <span class="${on}">●</span>`;
+      userList.appendChild(d);
+    });
+  });
+}
+
+/* ===== ADMIN ===== */
 function deleteUser(){
   const u=searchUser.value.trim();
   if(!u||u===CONFIG.adminUsername) return;
   db.ref("users/"+u).remove();
 }
-
 function toggleAdmin(){
   const u=searchUser.value.trim();
-  if(!u) return;
   db.ref("users/"+u+"/role").get().then(s=>{
     const r=s.val()==="admin"?"user":"admin";
     db.ref("users/"+u+"/role").set(r);
@@ -177,42 +145,34 @@ function toggleAdmin(){
 function sendMessage(){
   const t=msg.value.trim();
   if(!t) return;
-  db.ref("messages").push({
-    user:currentUser,
-    role:currentRole,
-    text:t
-  });
+  db.ref("messages").push({user:currentUser,text:t});
   msg.value="";
 }
 
-db.ref("messages").on("child_added",s=>{
-  const m=s.val();
-  const id=s.key;
+function listenMessages(){
+  db.ref("messages").on("child_added",s=>{
+    const m=s.val(), id=s.key;
+    const d=document.createElement("div");
+    d.className="msg";
+    d.id=id;
+    d.innerHTML=`<span>${m.user}: ${m.text}</span>`;
 
-  const d=document.createElement("div");
-  d.className="msg";
-  d.id=id;
+    if(m.user===currentUser||currentRole==="admin"){
+      const tr=document.createElement("span");
+      tr.className="trash";
+      tr.innerText="🗑️";
+      tr.onclick=()=>db.ref("messages/"+id).remove();
+      d.appendChild(tr);
+    }
+    messages.appendChild(d);
+    messages.scrollTop=messages.scrollHeight;
+  });
 
-  const left=document.createElement("div");
-  left.innerHTML=`<span class="name">${m.user}:</span> ${m.text}`;
-  d.appendChild(left);
-
-  if(m.user===currentUser || currentRole==="admin"){
-    const tr=document.createElement("span");
-    tr.className="trash";
-    tr.innerText="🗑️";
-    tr.onclick=()=>db.ref("messages/"+id).remove();
-    d.appendChild(tr);
-  }
-
-  messages.appendChild(d);
-  messages.scrollTop=messages.scrollHeight;
-});
-
-db.ref("messages").on("child_removed",s=>{
-  const el=document.getElementById(s.key);
-  if(el) el.remove();
-});
+  db.ref("messages").on("child_removed",s=>{
+    const el=document.getElementById(s.key);
+    if(el) el.remove();
+  });
+}
 </script>
 
 </body>
