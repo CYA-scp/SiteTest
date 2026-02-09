@@ -19,17 +19,22 @@ body{
 .fade{animation:fade .3s}
 @keyframes fade{from{opacity:0;transform:scale(.96)}to{opacity:1}}
 
-.login,.settings{
+input.error{border:1px solid #ed4245}
+.error-text{color:#ed4245;font-size:13px;margin-top:4px}
+
+.login,.settings,.admin{
   background:#313338;
   padding:20px;
   border-radius:8px;
   width:320px;
 }
-.login input,.settings input,button{
+
+.login input,.settings input,.admin input,button{
   width:100%;
   margin-top:8px;
   padding:8px;
 }
+
 button{background:#5865f2;color:white;border:none;cursor:pointer}
 
 .app{
@@ -53,11 +58,13 @@ button{background:#5865f2;color:white;border:none;cursor:pointer}
 .tag{color:#22c55e;font-size:12px}
 .online{color:#22c55e}.offline{color:#ef4444}
 
-.settings{
-  position:absolute;left:20px;top:20px;display:none
+.settings,.admin{
+  position:absolute;
+  left:20px;
+  top:20px;
+  display:none;
 }
 .red{background:#ed4245}
-.green{background:#22c55e}
 </style>
 </head>
 
@@ -68,19 +75,21 @@ button{background:#5865f2;color:white;border:none;cursor:pointer}
   <input id="luser" placeholder="Username">
   <input id="lpass" type="password" placeholder="Password">
   <button onclick="login()">Daxil ol</button>
-  <div id="loginMsg"></div>
+  <div id="loginError" class="error-text"></div>
 </div>
 
 <div class="app fade" id="app">
   <div class="sidebar">
-    <b>Users</b> <span onclick="toggleSettings()" style="cursor:pointer">⚙️</span>
+    <b>Users</b>
+    <span onclick="toggleSettings()" style="cursor:pointer">⚙️</span>
+    <span onclick="toggleAdmin()" id="adminBtn" style="cursor:pointer;display:none">👑</span>
     <div id="userList"></div>
   </div>
 
   <div class="chat">
-    <div class="messages" id="messages"></div>
+    <div class="messages" id="messagesBox"></div>
     <div class="input">
-      <input id="msg" placeholder="Mesaj yaz..."
+      <input id="msgInput" placeholder="Mesaj yaz..."
         onkeydown="if(event.key==='Enter')sendMessage()">
       <button onclick="sendMessage()">Göndər</button>
     </div>
@@ -89,22 +98,22 @@ button{background:#5865f2;color:white;border:none;cursor:pointer}
 
 <div class="settings fade" id="settings">
   <b>Ayarlar</b>
-
-  <label>Tag (max 7)</label>
-  <input id="tag">
-
-  <label>Profil şəkli (URL)</label>
-  <input id="avatarUrl" placeholder="https://...">
-
+  <input id="tagInput" placeholder="Tag (max 7)">
+  <input id="avatarUrl" placeholder="Avatar URL">
   <button onclick="togglePassword()">Şifrəni dəyiş</button>
-
   <div id="passBox" style="display:none">
     <input id="oldPass" type="password" placeholder="Köhnə şifrə">
     <input id="newPass" type="password" placeholder="Yeni şifrə">
   </div>
-
-  <button class="green" onclick="saveSettings()">Yadda saxla</button>
+  <button onclick="saveSettings()">Yadda saxla</button>
   <button class="red" onclick="logout()">Çıxış</button>
+</div>
+
+<div class="admin fade" id="adminPanel">
+  <b>Admin Panel</b>
+  <input id="deleteUserInput" placeholder="Username sil">
+  <button class="red" onclick="deleteUser()">Sil</button>
+  <div id="adminError" class="error-text"></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -117,48 +126,26 @@ firebase.initializeApp({
 });
 const db=firebase.database();
 
-let user=null;
+let currentUser=null;
+let currentRole="user";
 
-/* COOLDOWN */
-let attempts=localStorage.getItem("attempts")?parseInt(localStorage.getItem("attempts")):0;
-let cooldownUntil=localStorage.getItem("cooldownUntil")?parseInt(localStorage.getItem("cooldownUntil")):0;
-
-/* AUTO LOGIN */
-const saved=localStorage.getItem("user");
-if(saved){
-  db.ref("users/"+saved).get().then(s=>{
-    if(s.exists() && !s.val().deleted){
-      user=saved;
-      start();
-    }
-  });
-}
-
+/* LOGIN */
 function login(){
-  const now=Date.now();
-  if(now<cooldownUntil){
-    loginMsg.innerText=`⏳ ${Math.ceil((cooldownUntil-now)/1000)}s gözlə`;
-    return;
-  }
+  loginError.innerText="";
+  luser.classList.remove("error");
+  lpass.classList.remove("error");
 
   db.ref("users/"+luser.value).get().then(s=>{
-    if(!s.exists()||s.val().password!==lpass.value){
-      attempts++;
-      localStorage.setItem("attempts",attempts);
-      if(attempts>=3){
-        cooldownUntil=Date.now()+20000;
-        localStorage.setItem("cooldownUntil",cooldownUntil);
-        attempts=0;
-      }
+    if(!s.exists() || s.val().password!==lpass.value){
+      loginError.innerText="Username və ya şifrə yanlışdır";
+      luser.classList.add("error");
+      lpass.classList.add("error");
       return;
     }
 
-    attempts=0;
-    localStorage.removeItem("attempts");
-    localStorage.removeItem("cooldownUntil");
-
-    user=luser.value;
-    localStorage.setItem("user",user);
+    currentUser=luser.value;
+    currentRole=s.val().role||"user";
+    localStorage.setItem("user",currentUser);
     start();
   });
 }
@@ -166,26 +153,14 @@ function login(){
 function start(){
   loginBox.style.display="none";
   app.style.display="flex";
-  db.ref("users/"+user+"/online").set(true);
-  users();
-  messages();
-}
-
-function logout(){
-  db.ref("users/"+user+"/online").set(false);
-  localStorage.removeItem("user");
-  location.reload();
-}
-
-function toggleSettings(){
-  settings.style.display=settings.style.display==="block"?"none":"block";
-}
-function togglePassword(){
-  passBox.style.display=passBox.style.display==="none"?"block":"none";
+  if(currentRole==="admin") adminBtn.style.display="inline";
+  db.ref("users/"+currentUser+"/online").set(true);
+  loadUsers();
+  listenMessages();
 }
 
 /* USERS */
-function users(){
+function loadUsers(){
   db.ref("users").on("value",s=>{
     userList.innerHTML="";
     s.forEach(u=>{
@@ -193,7 +168,8 @@ function users(){
       userList.innerHTML+=`
       <div class="user">
         <img src="${u.val().avatar||'https://i.imgur.com/6VBx3io.png'}">
-        ${u.key} ${u.val().tag?`<span class="tag">(${u.val().tag})</span>`:""}
+        ${u.key}
+        ${u.val().tag?`<span class="tag">(${u.val().tag})</span>`:""}
         <span class="${u.val().online?'online':'offline'}">●</span>
       </div>`;
     });
@@ -202,37 +178,64 @@ function users(){
 
 /* CHAT */
 function sendMessage(){
-  if(!msg.value) return;
-  db.ref("messages").push({user,text:msg.value});
-  msg.value="";
+  if(!msgInput.value.trim()) return;
+  db.ref("messages").push({
+    user:currentUser,
+    text:msgInput.value
+  });
+  msgInput.value="";
 }
-function messages(){
+
+function listenMessages(){
   db.ref("messages").on("child_added",s=>{
     const m=s.val();
-    messages.innerHTML+=`
+    messagesBox.innerHTML+=`
     <div class="msg">
       <img src="https://i.imgur.com/6VBx3io.png">
       <div><b>${m.user}</b>: ${m.text}</div>
     </div>`;
+    messagesBox.scrollTop=messagesBox.scrollHeight;
   });
 }
 
-/* SETTINGS SAVE */
+/* SETTINGS */
+function toggleSettings(){
+  settings.style.display=settings.style.display==="block"?"none":"block";
+}
+function togglePassword(){
+  passBox.style.display=passBox.style.display==="none"?"block":"none";
+}
 function saveSettings(){
-  if(tag.value.length>7) return alert("Tag max 7");
+  if(tagInput.value.length>7){
+    tagInput.classList.add("error");
+    return;
+  }
+  db.ref("users/"+currentUser+"/tag").set(tagInput.value);
+  if(avatarUrl.value)
+    db.ref("users/"+currentUser+"/avatar").set(avatarUrl.value);
+  settings.style.display="none";
+}
 
-  db.ref("users/"+user).get().then(s=>{
-    if(passBox.style.display==="block"){
-      if(oldPass.value!==s.val().password) return alert("Köhnə şifrə yanlışdır");
-      if(newPass.value) db.ref("users/"+user+"/password").set(newPass.value);
-    }
+/* ADMIN */
+function toggleAdmin(){
+  adminPanel.style.display=adminPanel.style.display==="block"?"none":"block";
+}
+function deleteUser(){
+  adminError.innerText="";
+  const u=deleteUserInput.value;
+  if(!u){
+    adminError.innerText="Username yaz";
+    return;
+  }
+  db.ref("users/"+u+"/deleted").set(true);
+  db.ref("users/"+u+"/online").set(false);
+}
 
-    db.ref("users/"+user+"/tag").set(tag.value);
-    if(avatarUrl.value)
-      db.ref("users/"+user+"/avatar").set(avatarUrl.value);
-
-    settings.style.display="none";
-  });
+/* LOGOUT */
+function logout(){
+  db.ref("users/"+currentUser+"/online").set(false);
+  localStorage.removeItem("user");
+  location.reload();
 }
 </script>
 
