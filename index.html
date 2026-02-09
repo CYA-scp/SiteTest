@@ -94,6 +94,7 @@ firebase.initializeApp({
 });
 const db=firebase.database();
 let currentUser=null,currentRole="user";
+let messageKeys = new Set();
 
 /* LOGIN */
 function login(){
@@ -101,9 +102,7 @@ function login(){
   const u=luser.value.trim(),p=lpass.value.trim();
   if(!u||!p) return;
   db.ref("users/"+u).get().then(s=>{
-    if(!s.exists()){
-      loginError.innerText="User mövcud deyil"; return;
-    }
+    if(!s.exists()){ loginError.innerText="User mövcud deyil"; return;}
     const user=s.val();
     if(user.loginAttempts===0){ loginError.innerText="Limit bitib"; return;}
     if(user.password!==p){
@@ -149,16 +148,18 @@ function sendMessage(){
     user:currentUser,
     text:msgInput.value,
     owner:currentUser,
-    avatar: document.getElementById("avatarUrl").value||'https://i.imgur.com/6VBx3io.png'
+    avatar: document.getElementById("avatarUrl").value || 'https://i.imgur.com/6VBx3io.png'
   });
   msgInput.value="";
 }
 
 function listenMessages(){
   db.ref("messages").on("child_added",s=>{
+    if(messageKeys.has(s.key)) return; // təkrar əlavə olmur
+    messageKeys.add(s.key);
     const m=s.val();
-    const canEdit = (m.owner===currentUser || currentRole==="admin");
-    const canDelete = canEdit;
+    const canEdit=(m.owner===currentUser || currentRole==="admin");
+    const canDelete=canEdit;
     messagesBox.innerHTML+=`<div class="msg" id="msg_${s.key}">
       <img src="${m.avatar||'https://i.imgur.com/6VBx3io.png'}">
       <div>
@@ -170,6 +171,7 @@ function listenMessages(){
     messagesBox.scrollTop=messagesBox.scrollHeight;
   });
 
+  // avatar sync tez-tez
   db.ref("users").on("child_changed",snap=>{
     const uid=snap.key,avatar=snap.val().avatar;
     document.querySelectorAll(".msg").forEach(div=>{
@@ -178,7 +180,7 @@ function listenMessages(){
     if(uid===currentUser) refreshAdminBtn();
   });
 
-  db.ref("messages").on("child_removed", s=>{
+  db.ref("messages").on("child_removed",s=>{
     const el=document.getElementById("msg_"+s.key); if(el) el.remove();
   });
 }
