@@ -5,46 +5,151 @@
 <title>Private Pro Chat</title>
 
 <style>
+*{box-sizing:border-box}
 body{
-  margin:0;background:#1e1f22;font-family:Arial;color:#dcddde;
-  height:100vh;display:flex;justify-content:center;align-items:center
+  margin:0;
+  background:#1e1f22;
+  font-family:Arial;
+  color:#dcddde;
+  height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
 }
-.login,.app{
-  background:#313338;border-radius:8px;
+
+/* ANIMATION */
+.fade{
+  animation:fadeIn .4s ease;
 }
+@keyframes fadeIn{
+  from{opacity:0;transform:scale(.97)}
+  to{opacity:1;transform:scale(1)}
+}
+
+/* LOGIN */
 .login{
-  width:300px;padding:20px
+  width:320px;
+  background:#313338;
+  padding:20px;
+  border-radius:8px;
 }
 .login input,.login button{
-  width:100%;margin-top:8px;padding:8px
+  width:100%;
+  margin-top:8px;
+  padding:8px;
 }
-.login button{background:#5865f2;border:none;color:white}
+.login button{
+  background:#5865f2;
+  border:none;
+  color:white;
+}
 
+/* APP */
 .app{
-  width:950px;height:540px;display:none;overflow:hidden
+  width:1000px;
+  height:560px;
+  background:#313338;
+  border-radius:10px;
+  display:none;
+  overflow:hidden;
 }
+
+/* SIDEBAR */
 .sidebar{
-  width:260px;background:#2b2d31;padding:10px
+  width:260px;
+  background:#2b2d31;
+  padding:10px;
+  display:flex;
+  flex-direction:column;
 }
-.user{padding:6px;border-radius:4px}
+.topbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.settingsBtn{
+  cursor:pointer;
+}
+
+/* USERS */
+.user{
+  display:flex;
+  align-items:center;
+  margin-top:6px;
+}
+.user img{
+  width:32px;height:32px;
+  border-radius:50%;
+  margin-right:6px;
+}
 .online{color:#22c55e}
 .offline{color:#ef4444}
 
-.chat{flex:1;display:flex;flex-direction:column}
-.messages{flex:1;padding:10px;overflow-y:auto}
-.msg{margin-bottom:6px;display:flex;justify-content:space-between}
-.trash{cursor:pointer;color:#ed4245}
-
-.input{display:flex;padding:10px;background:#383a40}
-.input input{flex:1;background:#1e1f22;border:none;color:white;padding:8px}
-.input button{margin-left:8px;background:#5865f2;border:none;color:white}
-
-.panel{
-  border-top:1px solid #3f4147;
-  margin-top:6px;padding-top:6px
+/* CHAT */
+.chat{
+  flex:1;
+  display:flex;
+  flex-direction:column;
 }
-.panel input,.panel button{
-  width:100%;margin-top:6px;padding:6px
+.messages{
+  flex:1;
+  padding:10px;
+  overflow-y:auto;
+}
+.msg{
+  display:flex;
+  align-items:flex-start;
+  margin-bottom:8px;
+}
+.msg img{
+  width:36px;height:36px;
+  border-radius:50%;
+  margin-right:6px;
+}
+.name{font-weight:bold}
+.tag{color:#22c55e;font-size:12px}
+.trash{margin-left:6px;cursor:pointer;color:#ed4245}
+
+/* INPUT */
+.input{
+  display:flex;
+  padding:10px;
+  background:#383a40;
+}
+.input input{
+  flex:1;
+  background:#1e1f22;
+  border:none;
+  color:white;
+  padding:8px;
+}
+.input button{
+  margin-left:8px;
+  background:#5865f2;
+  border:none;
+  color:white;
+  padding:8px 14px;
+}
+
+/* SETTINGS */
+.settings{
+  position:absolute;
+  left:20px;
+  top:20px;
+  background:#1e1f22;
+  padding:12px;
+  border-radius:8px;
+  display:none;
+  width:240px;
+}
+.settings input{
+  width:100%;
+  margin-top:6px;
+  padding:6px;
+}
+.settings button{
+  width:100%;
+  margin-top:6px;
 }
 .red{background:#ed4245;color:white;border:none}
 .green{background:#22c55e;border:none}
@@ -53,44 +158,22 @@ body{
 
 <body>
 
-<!-- LOGIN -->
-<div class="login" id="loginBox">
+<div class="login fade" id="loginBox">
   <h3>Login</h3>
-  <input id="username" placeholder="Username">
-  <input id="password" type="password" placeholder="Password">
+  <input id="luser" placeholder="Username">
+  <input id="lpass" type="password" placeholder="Password">
   <button onclick="login()">Daxil ol</button>
+  <div id="loginMsg"></div>
 </div>
 
-<!-- APP -->
-<div class="app" id="app">
+<div class="app fade" id="app">
 
 <div class="sidebar">
-  <h4>Users</h4>
+  <div class="topbar">
+    <b>Users</b>
+    <span class="settingsBtn" onclick="toggleSettings()">⚙️</span>
+  </div>
   <div id="userList"></div>
-
-  <!-- SETTINGS -->
-  <div class="panel">
-    <input id="tagInput" placeholder="Tag (max 10)">
-    <button onclick="saveTag()">Tag saxla</button>
-
-    <input id="newPass" placeholder="Yeni şifrə">
-    <button onclick="changePassword()">Şifrə dəyiş</button>
-
-    <button class="red" onclick="logout()">Hesabdan çıx</button>
-  </div>
-
-  <!-- ADMIN -->
-  <div class="panel" id="adminPanel" style="display:none">
-    <input id="newUser" placeholder="Yeni username">
-    <input id="newUserPass" placeholder="Yeni şifrə">
-    <button class="green" onclick="addUser()">User əlavə et</button>
-
-    <input id="targetUser" placeholder="User adı">
-    <button class="red" onclick="deleteUser()">User sil</button>
-  </div>
-
-  <!-- ADMIN VIEW -->
-  <div class="panel" id="adminView" style="display:none"></div>
 </div>
 
 <div class="chat">
@@ -104,140 +187,132 @@ body{
 
 </div>
 
+<!-- SETTINGS -->
+<div class="settings fade" id="settings">
+  <b>Ayarlar</b>
+  <input id="tag" placeholder="Tag (max 7)">
+  <input id="oldPass" placeholder="Köhnə şifrə">
+  <input id="newPass" placeholder="Yeni şifrə">
+  <input id="newName" placeholder="Yeni username">
+  <input id="avatar" placeholder="Profil şəkli URL">
+  <button class="green" onclick="saveSettings()">Yadda saxla</button>
+  <button class="red" onclick="logout()">Çıxış</button>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
-const CONFIG={
-  firebase:{
-    apiKey:"AIzaSyC4t6Cu-q8iIHGy3V5g-Q14s3qnwsnfRKU",
-    databaseURL:"https://projectchat-bcb6e-default-rtdb.firebaseio.com"
-  }
+const firebaseConfig={
+  apiKey:"AIzaSyC4t6Cu-q8iIHGy3V5g-Q14s3qnwsnfRKU",
+  databaseURL:"https://projectchat-bcb6e-default-rtdb.firebaseio.com"
 };
-firebase.initializeApp(CONFIG.firebase);
+firebase.initializeApp(firebaseConfig);
 const db=firebase.database();
 
-let currentUser="", currentRole="user";
+let user=null, role="user";
 
-/* LOGIN */
-function login(){
-  const u=username.value.trim(), p=password.value.trim();
-  db.ref("users/"+u).get().then(s=>{
-    if(!s.exists()) return alert("User yoxdur");
-    if(s.val().deleted) return alert("Hesabın silinib ❌");
-    if(s.val().password!==p) return alert("Parol səhv");
-
-    currentUser=u;
-    currentRole=s.val().role;
-    db.ref("users/"+u+"/online").set(true);
-
-    window.addEventListener("beforeunload",()=>logout(true));
-
-    loginBox.style.display="none";
-    app.style.display="flex";
-
-    if(currentRole==="admin"){
-      adminPanel.style.display="block";
-      adminView.style.display="block";
+/* AUTO LOGIN */
+const saved=localStorage.getItem("user");
+if(saved){
+  db.ref("users/"+saved).get().then(s=>{
+    if(s.exists() && !s.val().deleted){
+      user=saved; role=s.val().role;
+      start();
     }
-
-    listenUsers();
-    listenMessages();
-    adminPasswords();
   });
 }
 
-/* LOGOUT */
+function login(){
+  const u=luser.value,p=lpass.value;
+  db.ref("users/"+u).get().then(s=>{
+    if(!s.exists()) return;
+    if(s.val().deleted){
+      loginMsg.innerText="Hesabınız silindi ❌";
+      return;
+    }
+    if(s.val().password!==p) return;
+    user=u; role=s.val().role;
+    localStorage.setItem("user",u);
+    start();
+  });
+}
+
+function start(){
+  loginBox.style.display="none";
+  app.style.display="flex";
+  db.ref("users/"+user+"/online").set(true);
+  window.addEventListener("beforeunload",()=>logout(true));
+  users();
+  messages();
+}
+
 function logout(silent){
-  if(currentUser){
-    db.ref("users/"+currentUser+"/online").set(false);
-  }
+  db.ref("users/"+user+"/online").set(false);
+  localStorage.removeItem("user");
   if(!silent) location.reload();
 }
 
-/* USERS LIST */
-function listenUsers(){
+/* USERS */
+function users(){
   db.ref("users").on("value",s=>{
     userList.innerHTML="";
     s.forEach(u=>{
       if(u.val().deleted) return;
-      const tag=u.val().tag?` (${u.val().tag})`:"";
-      const on=u.val().online?"online":"offline";
       const d=document.createElement("div");
       d.className="user";
-      d.innerHTML=`${u.key}${tag} <span class="${on}">●</span>`;
+      d.innerHTML=
+        `<img src="${u.val().avatar||'https://i.imgur.com/6VBx3io.png'}">
+         ${u.key} ${u.val().tag?`<span class="tag">(${u.val().tag})</span>`:""}
+         <span class="${u.val().online?'online':'offline'}">●</span>`;
       userList.appendChild(d);
-    });
-  });
-}
-
-/* TAG */
-function saveTag(){
-  const t=tagInput.value.trim().slice(0,10);
-  db.ref("users/"+currentUser+"/tag").set(t);
-}
-
-/* PASSWORD */
-function changePassword(){
-  const p=newPass.value.trim();
-  if(p) db.ref("users/"+currentUser+"/password").set(p);
-}
-
-/* ADMIN ADD USER */
-function addUser(){
-  db.ref("users/"+newUser.value).set({
-    password:newUserPass.value,
-    role:"user",
-    online:false,
-    deleted:false,
-    tag:""
-  });
-}
-
-/* ADMIN DELETE USER */
-function deleteUser(){
-  const u=targetUser.value.trim();
-  if(!u||u===currentUser) return;
-  db.ref("users/"+u+"/deleted").set(true);
-  db.ref("system").push({text:`${u} hesabı silindi`});
-}
-
-/* ADMIN VIEW PASSWORDS */
-function adminPasswords(){
-  if(currentRole!=="admin") return;
-  db.ref("users").on("value",s=>{
-    adminView.innerHTML="<h4>Hesablar</h4>";
-    s.forEach(u=>{
-      adminView.innerHTML+=
-        `<div>${u.key} | ${u.val().password}</div>`;
     });
   });
 }
 
 /* CHAT */
 function sendMessage(){
-  const t=msg.value.trim();
-  if(!t) return;
-  db.ref("messages").push({user:currentUser,text:t});
+  if(!msg.value) return;
+  db.ref("messages").push({
+    user,
+    text:msg.value
+  });
   msg.value="";
 }
-
-function listenMessages(){
+function messages(){
   db.ref("messages").on("child_added",s=>{
-    const m=s.val(), id=s.key;
+    const m=s.val();
     const d=document.createElement("div");
     d.className="msg";
-    d.id=id;
-    d.innerHTML=`<span>${m.user}: ${m.text}</span>`;
-    if(m.user===currentUser||currentRole==="admin"){
-      const tr=document.createElement("span");
-      tr.className="trash";
-      tr.innerText="🗑️";
-      tr.onclick=()=>db.ref("messages/"+id).remove();
-      d.appendChild(tr);
-    }
+    d.innerHTML=
+      `<img src="https://i.imgur.com/6VBx3io.png">
+       <div><span class="name">${m.user}</span>: ${m.text}</div>`;
     messages.appendChild(d);
-    messages.scrollTop=messages.scrollHeight;
+  });
+}
+
+/* SETTINGS */
+function toggleSettings(){
+  settings.style.display=settings.style.display==="block"?"none":"block";
+}
+function saveSettings(){
+  if(tag.value.length>7) return;
+  db.ref("users/"+user).get().then(s=>{
+    if(oldPass.value!==s.val().password) return;
+    const data={
+      tag:tag.value,
+      avatar:avatar.value
+    };
+    if(newPass.value) data.password=newPass.value;
+    if(newName.value){
+      db.ref("users/"+newName.value).set({...s.val(),...data});
+      db.ref("users/"+user).remove();
+      localStorage.setItem("user",newName.value);
+      user=newName.value;
+    }else{
+      db.ref("users/"+user).update(data);
+    }
+    settings.style.display="none";
   });
 }
 </script>
