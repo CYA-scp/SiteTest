@@ -111,8 +111,23 @@ button{background:#5865f2;color:white;border:none;cursor:pointer}
 
 <div class="admin fade" id="adminPanel">
   <b>Admin Panel</b>
+
   <input id="deleteUserInput" placeholder="Username sil">
   <button class="red" onclick="deleteUser()">Sil</button>
+
+  <hr>
+
+  <b>User yarat</b>
+  <input id="newUsername" placeholder="username">
+  <input id="newPassword" type="password" placeholder="password">
+  <button onclick="createUser()">Yarat!</button>
+
+  <hr>
+
+  <b>Admin et</b>
+  <input id="makeAdminInput" placeholder="Username admin et">
+  <button onclick="makeAdmin()">Admin et</button>
+
   <div id="adminError" class="error-text"></div>
 </div>
 
@@ -132,20 +147,13 @@ let currentRole="user";
 /* LOGIN */
 function login(){
   loginError.innerText="";
-  luser.classList.remove("error");
-  lpass.classList.remove("error");
-
   db.ref("users/"+luser.value).get().then(s=>{
     if(!s.exists() || s.val().password!==lpass.value){
       loginError.innerText="Username və ya şifrə yanlışdır";
-      luser.classList.add("error");
-      lpass.classList.add("error");
       return;
     }
-
     currentUser=luser.value;
     currentRole=s.val().role||"user";
-    localStorage.setItem("user",currentUser);
     start();
   });
 }
@@ -181,7 +189,8 @@ function sendMessage(){
   if(!msgInput.value.trim()) return;
   db.ref("messages").push({
     user:currentUser,
-    text:msgInput.value
+    text:msgInput.value,
+    owner:currentUser
   });
   msgInput.value="";
 }
@@ -189,13 +198,24 @@ function sendMessage(){
 function listenMessages(){
   db.ref("messages").on("child_added",s=>{
     const m=s.val();
+    const canDelete=(m.owner===currentUser||currentRole==="admin");
     messagesBox.innerHTML+=`
-    <div class="msg">
+    <div class="msg" id="msg_${s.key}">
       <img src="https://i.imgur.com/6VBx3io.png">
-      <div><b>${m.user}</b>: ${m.text}</div>
+      <div>
+        <b>${m.user}</b>: ${m.text}
+        ${canDelete?`<span style="color:#ed4245;cursor:pointer"
+        onclick="deleteMsg('${s.key}')"> ✖</span>`:""}
+      </div>
     </div>`;
     messagesBox.scrollTop=messagesBox.scrollHeight;
   });
+}
+
+function deleteMsg(id){
+  db.ref("messages/"+id).remove();
+  const el=document.getElementById("msg_"+id);
+  if(el) el.remove();
 }
 
 /* SETTINGS */
@@ -206,10 +226,7 @@ function togglePassword(){
   passBox.style.display=passBox.style.display==="none"?"block":"none";
 }
 function saveSettings(){
-  if(tagInput.value.length>7){
-    tagInput.classList.add("error");
-    return;
-  }
+  if(tagInput.value.length>7) return;
   db.ref("users/"+currentUser+"/tag").set(tagInput.value);
   if(avatarUrl.value)
     db.ref("users/"+currentUser+"/avatar").set(avatarUrl.value);
@@ -220,24 +237,54 @@ function saveSettings(){
 function toggleAdmin(){
   adminPanel.style.display=adminPanel.style.display==="block"?"none":"block";
 }
+
 function deleteUser(){
-  adminError.innerText="";
   const u=deleteUserInput.value;
-  if(!u){
-    adminError.innerText="Username yaz";
-    return;
-  }
+  if(!u) return;
   db.ref("users/"+u+"/deleted").set(true);
   db.ref("users/"+u+"/online").set(false);
+}
+
+function createUser(){
+  const u=newUsername.value.trim();
+  const p=newPassword.value.trim();
+  if(!u||!p){
+    adminError.innerText="Boş buraxma";
+    return;
+  }
+  db.ref("users/"+u).get().then(s=>{
+    if(s.exists()){
+      adminError.innerText="User artıq var";
+      return;
+    }
+    db.ref("users/"+u).set({
+      password:p,
+      role:"user",
+      online:false
+    });
+    adminError.innerText="User yaradıldı ✔";
+    newUsername.value="";
+    newPassword.value="";
+  });
+}
+
+function makeAdmin(){
+  const u=makeAdminInput.value.trim();
+  if(!u) return;
+  db.ref("users/"+u+"/role").set("admin");
+  adminError.innerText="Admin edildi 👑";
 }
 
 /* LOGOUT */
 function logout(){
   db.ref("users/"+currentUser+"/online").set(false);
-  localStorage.removeItem("user");
   location.reload();
 }
 </script>
+
+</body>
+</html>
+
 
 </body>
 </html>
