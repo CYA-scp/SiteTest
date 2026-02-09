@@ -65,6 +65,12 @@ button{background:#5865f2;color:white;border:none;cursor:pointer}
   display:none;
 }
 .red{background:#ed4245}
+.edit-btn{
+  color:#facc15;
+  cursor:pointer;
+  margin-left:6px;
+  font-size:12px;
+}
 </style>
 </head>
 
@@ -200,42 +206,52 @@ function sendMessage(){
 function listenMessages(){
   db.ref("messages").on("child_added",s=>{
     const m=s.val();
-    const canDelete=(m.owner===currentUser||currentRole==="admin");
+    const canEdit = (m.owner===currentUser || currentRole==="admin");
+    const canDelete = canEdit;
+
     messagesBox.innerHTML+=`
     <div class="msg" id="msg_${s.key}">
       <img src="${m.avatar||'https://i.imgur.com/6VBx3io.png'}">
       <div>
-        <b>${m.user}</b>: ${m.text}
-        ${canDelete?`<span style="color:#ed4245;cursor:pointer"
-        onclick="deleteMsg('${s.key}')"> ✖</span>`:""}
+        <b>${m.user}</b>: 
+        <span id="text_${s.key}">${m.text}</span>
+        ${canDelete?`<span style="color:#ed4245;cursor:pointer" onclick="deleteMsg('${s.key}')"> ✖</span>`:""}
+        ${canEdit?`<span class="edit-btn" onclick="editMsg('${s.key}')">✎</span>`:""}
       </div>
     </div>`;
     messagesBox.scrollTop=messagesBox.scrollHeight;
-    db.ref("messages").on("child_removed", s=>{
-  const el = document.getElementById("msg_"+s.key);
-  if(el) el.remove();
-});
-
+  });
 
   // avatar update listener
   db.ref("users").on("child_changed",snap=>{
     const uid=snap.key;
     const avatar=snap.val().avatar;
-    document.querySelectorAll(`.msg img`).forEach(img=>{
-      if(img.parentElement.querySelector("b").innerText===uid){
-        img.src=avatar||'https://i.imgur.com/6VBx3io.png';
+    document.querySelectorAll(`.msg`).forEach(div=>{
+      if(div.querySelector("b").innerText===uid){
+        div.querySelector("img").src = avatar||'https://i.imgur.com/6VBx3io.png';
       }
     });
-    if(uid===currentUser){
-      refreshAdminBtn(); // role dəyişikdirsə dərhal refresh
-    }
+    if(uid===currentUser) refreshAdminBtn();
+  });
+
+  // message remove listener
+  db.ref("messages").on("child_removed", s=>{
+    const el = document.getElementById("msg_"+s.key);
+    if(el) el.remove();
   });
 }
 
 function deleteMsg(id){
   db.ref("messages/"+id).remove();
-  const el=document.getElementById("msg_"+id);
-  if(el) el.remove();
+}
+
+function editMsg(id){
+  const span = document.getElementById("text_"+id);
+  const oldText = span.innerText;
+  const newText = prompt("Mesajı redaktə et:", oldText);
+  if(newText!==null && newText.trim()!==""){
+    db.ref("messages/"+id+"/text").set(newText);
+  }
 }
 
 /* SETTINGS */
@@ -261,7 +277,7 @@ function toggleAdmin(){
 function deleteUser(){
   const u=deleteUserInput.value.trim();
   if(!u) return;
-  db.ref("users/"+u).remove(); // silindikdə eyni adı yaratmaq olur
+  db.ref("users/"+u).remove();
 }
 
 function createUser(){
@@ -294,7 +310,7 @@ function toggleAdminRole(){
     if(s.exists() && s.val()==="admin"){
       db.ref("users/"+u+"/role").set("user");
       adminError.innerText=`${u} artıq user oldu`;
-      if(u===currentUser) refreshAdminBtn(); // özümüzü geri user edəndə admin xüsusiyyətləri silinir
+      if(u===currentUser) refreshAdminBtn();
     } else {
       db.ref("users/"+u+"/role").set("admin");
       adminError.innerText=`${u} artıq admin oldu`;
