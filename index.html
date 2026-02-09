@@ -4,238 +4,174 @@
 <meta charset="UTF-8">
 <title>Private Chat</title>
 
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
 <style>
-*{box-sizing:border-box}
-body{
-  margin:0;
-  background:#1e1f22;
-  font-family:Arial;
-  color:#dcddde;
-  height:100vh;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-}
-.fade{animation:fade .3s}
-@keyframes fade{from{opacity:0;transform:scale(.96)}to{opacity:1}}
-
-input.error{border:1px solid #ed4245}
-.error-text{color:#ed4245;font-size:13px;margin-top:4px}
-
-.login,.settings,.admin{
-  background:#313338;
-  padding:20px;
-  border-radius:8px;
-  width:320px;
-}
-
-.login input,.settings input,.admin input,button{
-  width:100%;
-  margin-top:8px;
-  padding:8px;
-}
-
-button{background:#5865f2;color:white;border:none;cursor:pointer}
-
-.app{
-  width:1000px;height:560px;
-  background:#313338;
-  border-radius:10px;
-  display:none;
-  overflow:hidden;
-}
-.sidebar{
-  width:260px;background:#2b2d31;padding:10px;
-}
-.chat{flex:1;display:flex;flex-direction:column}
-.messages{flex:1;padding:10px;overflow-y:auto}
-.msg{display:flex;margin-bottom:8px}
-.msg img{width:36px;height:36px;border-radius:50%;margin-right:6px}
-.input{display:flex;padding:10px;background:#383a40}
-.input input{flex:1;background:#1e1f22;border:none;color:white;padding:8px}
-.user{display:flex;align-items:center;margin-top:6px}
-.user img{width:32px;height:32px;border-radius:50%;margin-right:6px}
-.tag{color:#22c55e;font-size:12px}
-.online{color:#22c55e}.offline{color:#ef4444}
-
-.settings,.admin{
-  position:absolute;
-  left:20px;
-  top:20px;
-  display:none;
-}
-.red{background:#ed4245}
+body{margin:0;font-family:Arial;background:#0f172a;color:#e5e7eb}
+#login,#chat{display:none}
+.box{width:380px;margin:60px auto;background:#020617;padding:20px;border-radius:10px}
+input,button{width:100%;margin-top:8px;padding:8px;border-radius:6px;border:none}
+button{background:#22c55e;font-weight:bold;cursor:pointer}
+.err{color:#f87171;font-size:13px}
+#chatBox{height:300px;overflow-y:auto;border:1px solid #1e293b;padding:10px;margin-top:10px}
+.msg{display:flex;gap:8px;margin-bottom:8px}
+.msg img{width:32px;height:32px;border-radius:50%}
+.del{color:#ef4444;cursor:pointer;margin-left:6px}
+.tag{color:#38bdf8;font-size:12px}
+#side{position:fixed;left:0;top:0;width:180px;height:100%;background:#020617;padding:10px}
+.userItem{font-size:14px}
+.admin{color:#facc15}
 </style>
 </head>
 
 <body>
 
-<div class="login fade" id="loginBox">
-  <h3>Login</h3>
-  <input id="luser" placeholder="Username">
-  <input id="lpass" type="password" placeholder="Password">
-  <button onclick="login()">Daxil ol</button>
-  <div id="loginError" class="error-text"></div>
+<div id="side">
+<h4>Online</h4>
+<div id="online"></div>
+<button onclick="logout()">Çıxış</button>
+<div id="adminPanel"></div>
 </div>
 
-<div class="app fade" id="app">
-  <div class="sidebar">
-    <b>Users</b>
-    <span onclick="toggleSettings()" style="cursor:pointer">⚙️</span>
-    <span onclick="toggleAdmin()" id="adminBtn" style="cursor:pointer;display:none">👑</span>
-    <div id="userList"></div>
-  </div>
-
-  <div class="chat">
-    <div class="messages" id="messagesBox"></div>
-    <div class="input">
-      <input id="msgInput" placeholder="Mesaj yaz..."
-        onkeydown="if(event.key==='Enter')sendMessage()">
-      <button onclick="sendMessage()">Göndər</button>
-    </div>
-  </div>
+<div id="login" class="box">
+<h3>Login</h3>
+<input id="lu" placeholder="Username">
+<input id="lp" type="password" placeholder="Password">
+<div id="lerr" class="err"></div>
+<button onclick="login()">Daxil ol</button>
 </div>
 
-<div class="settings fade" id="settings">
-  <b>Ayarlar</b>
-  <input id="tagInput" placeholder="Tag (max 7)">
-  <input id="avatarUrl" placeholder="Avatar URL">
-  <button onclick="togglePassword()">Şifrəni dəyiş</button>
-  <div id="passBox" style="display:none">
-    <input id="oldPass" type="password" placeholder="Köhnə şifrə">
-    <input id="newPass" type="password" placeholder="Yeni şifrə">
-  </div>
-  <button onclick="saveSettings()">Yadda saxla</button>
-  <button class="red" onclick="logout()">Çıxış</button>
+<div id="chat" class="box">
+<h3 id="welcome"></h3>
+<div id="chatBox"></div>
+<input id="msg" placeholder="Mesaj yaz">
+<button onclick="sendMessage()">Göndər</button>
 </div>
-
-<div class="admin fade" id="adminPanel">
-  <b>Admin Panel</b>
-  <input id="deleteUserInput" placeholder="Username sil">
-  <button class="red" onclick="deleteUser()">Sil</button>
-  <div id="adminError" class="error-text"></div>
-</div>
-
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
-firebase.initializeApp({
-  apiKey:"AIzaSyC4t6Cu-q8iIHGy3V5g-Q14s3qnwsnfRKU",
-  databaseURL:"https://projectchat-bcb6e-default-rtdb.firebaseio.com"
-});
+const firebaseConfig={
+ apiKey:"AIzaSyC4t6Cu-q8iIHGy3V5g-Q14s3qnwsnfRKU",
+ databaseURL:"https://projectchat-bcb6e-default-rtdb.firebaseio.com"
+};
+firebase.initializeApp(firebaseConfig);
 const db=firebase.database();
 
-let currentUser=null;
-let currentRole="user";
+let user="",role="",tries=3,cooldown=false;
 
-/* LOGIN */
+const COLORS=["#22c55e","#38bdf8","#facc15","#f472b6","#a78bfa"];
+
+function show(id){login.style.display="none";chat.style.display="none";document.getElementById(id).style.display="block"}
+
 function login(){
-  loginError.innerText="";
-  luser.classList.remove("error");
-  lpass.classList.remove("error");
-
-  db.ref("users/"+luser.value).get().then(s=>{
-    if(!s.exists() || s.val().password!==lpass.value){
-      loginError.innerText="Username və ya şifrə yanlışdır";
-      luser.classList.add("error");
-      lpass.classList.add("error");
-      return;
-    }
-
-    currentUser=luser.value;
-    currentRole=s.val().role||"user";
-    localStorage.setItem("user",currentUser);
-    start();
-  });
+ if(cooldown) return;
+ const u=lu.value.trim(),p=lp.value;
+ lerr.textContent="";
+ db.ref("users/"+u).get().then(s=>{
+  if(!s.exists()){lerr.textContent="User yoxdur";return}
+  if(s.val().password!==p){
+   tries--;
+   if(tries<=0){
+    cooldown=true;
+    lerr.textContent="20 saniyə gözlə";
+    setTimeout(()=>{tries=3;cooldown=false;lerr.textContent=""},20000);
+   } else lerr.textContent="Şifrə səhv";
+   return;
+  }
+  user=u;role=s.val().role;
+  localStorage.user=u;
+  db.ref("online/"+u).set(true);
+  start();
+ });
 }
 
 function start(){
-  loginBox.style.display="none";
-  app.style.display="flex";
-  if(currentRole==="admin") adminBtn.style.display="inline";
-  db.ref("users/"+currentUser+"/online").set(true);
-  loadUsers();
-  listenMessages();
+ show("chat");
+ welcome.innerText="Xoş gəldin "+user;
+ listenMessages();
+ listenOnline();
+ if(role==="admin") adminUI();
 }
 
-/* USERS */
-function loadUsers(){
-  db.ref("users").on("value",s=>{
-    userList.innerHTML="";
-    s.forEach(u=>{
-      if(u.val().deleted) return;
-      userList.innerHTML+=`
-      <div class="user">
-        <img src="${u.val().avatar||'https://i.imgur.com/6VBx3io.png'}">
-        ${u.key}
-        ${u.val().tag?`<span class="tag">(${u.val().tag})</span>`:""}
-        <span class="${u.val().online?'online':'offline'}">●</span>
-      </div>`;
-    });
-  });
+function logout(){
+ db.ref("online/"+user).remove();
+ localStorage.clear();
+ location.reload();
 }
 
-/* CHAT */
+if(localStorage.user){
+ user=localStorage.user;
+ db.ref("users/"+user).get().then(s=>{
+  if(!s.exists()) return localStorage.clear();
+  role=s.val().role;
+  db.ref("online/"+user).set(true);
+  start();
+ });
+}else show("login");
+
 function sendMessage(){
-  if(!msgInput.value.trim()) return;
-  db.ref("messages").push({
-    user:currentUser,
-    text:msgInput.value
-  });
-  msgInput.value="";
+ if(!msg.value.trim()) return;
+ const id=db.ref("messages").push().key;
+ db.ref("messages/"+id).set({
+  id,user,text:msg.value,
+  color:COLORS[Math.abs(user.hashCode())%COLORS.length]
+ });
+ msg.value="";
 }
+
+String.prototype.hashCode=function(){return this.split("").reduce((a,b)=>{a=((a<<5)-a)+b.charCodeAt(0);return a&a},0)}
 
 function listenMessages(){
-  db.ref("messages").on("child_added",s=>{
-    const m=s.val();
-    messagesBox.innerHTML+=`
-    <div class="msg">
-      <img src="https://i.imgur.com/6VBx3io.png">
-      <div><b>${m.user}</b>: ${m.text}</div>
-    </div>`;
-    messagesBox.scrollTop=messagesBox.scrollHeight;
+ chatBox.innerHTML="";
+ db.ref("messages").on("child_added",s=>{
+  const m=s.val();
+  const d=document.createElement("div");
+  d.className="msg";
+  d.innerHTML=`
+   <img src="https://api.dicebear.com/7.x/identicon/svg?seed=${m.user}">
+   <div>
+    <b style="color:${m.color}">${m.user}</b>
+    ${m.user===user||role==="admin"?`<span class="del" onclick="delMsg('${m.id}')">🗑️</span>`:""}
+    <div>${m.text}</div>
+   </div>`;
+  chatBox.appendChild(d);
+  chatBox.scrollTop=chatBox.scrollHeight;
+ });
+}
+
+function delMsg(id){
+ db.ref("messages/"+id).get().then(s=>{
+  if(!s.exists())return;
+  if(role==="admin"||s.val().user===user)
+   db.ref("messages/"+id).remove();
+ });
+}
+
+function listenOnline(){
+ db.ref("online").on("value",s=>{
+  online.innerHTML="";
+  s.forEach(c=>{
+   online.innerHTML+=`<div class="userItem">${c.key}</div>`;
   });
+ });
 }
 
-/* SETTINGS */
-function toggleSettings(){
-  settings.style.display=settings.style.display==="block"?"none":"block";
-}
-function togglePassword(){
-  passBox.style.display=passBox.style.display==="none"?"block":"none";
-}
-function saveSettings(){
-  if(tagInput.value.length>7){
-    tagInput.classList.add("error");
-    return;
-  }
-  db.ref("users/"+currentUser+"/tag").set(tagInput.value);
-  if(avatarUrl.value)
-    db.ref("users/"+currentUser+"/avatar").set(avatarUrl.value);
-  settings.style.display="none";
+function adminUI(){
+ adminPanel.innerHTML=`
+ <h4>Admin</h4>
+ <input id="au" placeholder="User">
+ <input id="ap" placeholder="Pass">
+ <button onclick="addUser()">Add</button>
+ <button onclick="makeAdmin()">Admin et</button>
+ `;
 }
 
-/* ADMIN */
-function toggleAdmin(){
-  adminPanel.style.display=adminPanel.style.display==="block"?"none":"block";
-}
-function deleteUser(){
-  adminError.innerText="";
-  const u=deleteUserInput.value;
-  if(!u){
-    adminError.innerText="Username yaz";
-    return;
-  }
-  db.ref("users/"+u+"/deleted").set(true);
-  db.ref("users/"+u+"/online").set(false);
+function addUser(){
+ db.ref("users/"+au.value).set({password:ap.value,role:"user"});
 }
 
-/* LOGOUT */
-function logout(){
-  db.ref("users/"+currentUser+"/online").set(false);
-  localStorage.removeItem("user");
-  location.reload();
+function makeAdmin(){
+ db.ref("users/"+au.value+"/role").set("admin");
 }
 </script>
 
