@@ -9,26 +9,45 @@ body{
   margin:0;background:#1e1f22;font-family:Arial;color:#dcddde;
   height:100vh;display:flex;justify-content:center;align-items:center
 }
-.app{width:900px;height:520px;background:#313338;border-radius:8px;display:flex}
-.sidebar{width:240px;background:#2b2d31;padding:10px}
-.user{padding:6px;border-radius:4px;cursor:pointer}
-.user:hover{background:#3f4147}
-.online{color:#22c55e;font-size:10px}
-.offline{color:#ef4444;font-size:10px}
+.login,.app{
+  background:#313338;border-radius:8px;
+}
+.login{
+  width:300px;padding:20px
+}
+.login input,.login button{
+  width:100%;margin-top:8px;padding:8px
+}
+.login button{background:#5865f2;border:none;color:white}
+
+.app{
+  width:950px;height:540px;display:none;overflow:hidden
+}
+.sidebar{
+  width:260px;background:#2b2d31;padding:10px
+}
+.user{padding:6px;border-radius:4px}
+.online{color:#22c55e}
+.offline{color:#ef4444}
+
 .chat{flex:1;display:flex;flex-direction:column}
 .messages{flex:1;padding:10px;overflow-y:auto}
 .msg{margin-bottom:6px;display:flex;justify-content:space-between}
 .trash{cursor:pointer;color:#ed4245}
-.input{padding:10px;background:#383a40;display:flex}
-.input input{flex:1;background:#1e1f22;border:none;color:#fff;padding:8px}
-.input button{margin-left:8px;background:#5865f2;border:none;color:white;padding:8px 14px}
-.login{
-  width:300px;background:#313338;padding:20px;border-radius:8px
+
+.input{display:flex;padding:10px;background:#383a40}
+.input input{flex:1;background:#1e1f22;border:none;color:white;padding:8px}
+.input button{margin-left:8px;background:#5865f2;border:none;color:white}
+
+.panel{
+  border-top:1px solid #3f4147;
+  margin-top:6px;padding-top:6px
 }
-.login input{width:100%;margin-bottom:8px;padding:8px}
-.login button{width:100%;padding:8px;background:#5865f2;border:none;color:white}
-.adminPanel{border-top:1px solid #3f4147;padding-top:6px;margin-top:6px}
-.adminPanel input,.adminPanel button{width:100%;margin-top:6px;padding:6px}
+.panel input,.panel button{
+  width:100%;margin-top:6px;padding:6px
+}
+.red{background:#ed4245;color:white;border:none}
+.green{background:#22c55e;border:none}
 </style>
 </head>
 
@@ -43,17 +62,35 @@ body{
 </div>
 
 <!-- APP -->
-<div class="app" id="app" style="display:none">
+<div class="app" id="app">
 
 <div class="sidebar">
   <h4>Users</h4>
   <div id="userList"></div>
 
-  <div class="adminPanel" id="adminPanel" style="display:none">
-    <input id="searchUser" placeholder="User adı">
-    <button onclick="deleteUser()">User sil</button>
-    <button onclick="toggleAdmin()">Admin ver / al</button>
+  <!-- SETTINGS -->
+  <div class="panel">
+    <input id="tagInput" placeholder="Tag (max 10)">
+    <button onclick="saveTag()">Tag saxla</button>
+
+    <input id="newPass" placeholder="Yeni şifrə">
+    <button onclick="changePassword()">Şifrə dəyiş</button>
+
+    <button class="red" onclick="logout()">Hesabdan çıx</button>
   </div>
+
+  <!-- ADMIN -->
+  <div class="panel" id="adminPanel" style="display:none">
+    <input id="newUser" placeholder="Yeni username">
+    <input id="newUserPass" placeholder="Yeni şifrə">
+    <button class="green" onclick="addUser()">User əlavə et</button>
+
+    <input id="targetUser" placeholder="User adı">
+    <button class="red" onclick="deleteUser()">User sil</button>
+  </div>
+
+  <!-- ADMIN VIEW -->
+  <div class="panel" id="adminView" style="display:none"></div>
 </div>
 
 <div class="chat">
@@ -72,76 +109,112 @@ body{
 
 <script>
 const CONFIG={
-  adminUsername:"Huseyn(Qurucu)",
   firebase:{
     apiKey:"AIzaSyC4t6Cu-q8iIHGy3V5g-Q14s3qnwsnfRKU",
     databaseURL:"https://projectchat-bcb6e-default-rtdb.firebaseio.com"
   }
 };
-
 firebase.initializeApp(CONFIG.firebase);
 const db=firebase.database();
 
 let currentUser="", currentRole="user";
 
-/* ===== LOGIN ===== */
+/* LOGIN */
 function login(){
-  const u=username.value.trim();
-  const p=password.value.trim();
-
+  const u=username.value.trim(), p=password.value.trim();
   db.ref("users/"+u).get().then(s=>{
     if(!s.exists()) return alert("User yoxdur");
+    if(s.val().deleted) return alert("Hesabın silinib ❌");
     if(s.val().password!==p) return alert("Parol səhv");
 
     currentUser=u;
     currentRole=s.val().role;
-
     db.ref("users/"+u+"/online").set(true);
-    window.addEventListener("beforeunload",()=>{
-      db.ref("users/"+u+"/online").set(false);
-    });
+
+    window.addEventListener("beforeunload",()=>logout(true));
 
     loginBox.style.display="none";
     app.style.display="flex";
 
     if(currentRole==="admin"){
       adminPanel.style.display="block";
+      adminView.style.display="block";
     }
 
     listenUsers();
     listenMessages();
+    adminPasswords();
   });
 }
 
-/* ===== ONLINE USERS ===== */
+/* LOGOUT */
+function logout(silent){
+  if(currentUser){
+    db.ref("users/"+currentUser+"/online").set(false);
+  }
+  if(!silent) location.reload();
+}
+
+/* USERS LIST */
 function listenUsers(){
   db.ref("users").on("value",s=>{
     userList.innerHTML="";
     s.forEach(u=>{
-      const d=document.createElement("div");
+      if(u.val().deleted) return;
+      const tag=u.val().tag?` (${u.val().tag})`:"";
       const on=u.val().online?"online":"offline";
+      const d=document.createElement("div");
       d.className="user";
-      d.innerHTML=`${u.key} <span class="${on}">●</span>`;
+      d.innerHTML=`${u.key}${tag} <span class="${on}">●</span>`;
       userList.appendChild(d);
     });
   });
 }
 
-/* ===== ADMIN ===== */
-function deleteUser(){
-  const u=searchUser.value.trim();
-  if(!u||u===CONFIG.adminUsername) return;
-  db.ref("users/"+u).remove();
+/* TAG */
+function saveTag(){
+  const t=tagInput.value.trim().slice(0,10);
+  db.ref("users/"+currentUser+"/tag").set(t);
 }
-function toggleAdmin(){
-  const u=searchUser.value.trim();
-  db.ref("users/"+u+"/role").get().then(s=>{
-    const r=s.val()==="admin"?"user":"admin";
-    db.ref("users/"+u+"/role").set(r);
+
+/* PASSWORD */
+function changePassword(){
+  const p=newPass.value.trim();
+  if(p) db.ref("users/"+currentUser+"/password").set(p);
+}
+
+/* ADMIN ADD USER */
+function addUser(){
+  db.ref("users/"+newUser.value).set({
+    password:newUserPass.value,
+    role:"user",
+    online:false,
+    deleted:false,
+    tag:""
   });
 }
 
-/* ===== CHAT ===== */
+/* ADMIN DELETE USER */
+function deleteUser(){
+  const u=targetUser.value.trim();
+  if(!u||u===currentUser) return;
+  db.ref("users/"+u+"/deleted").set(true);
+  db.ref("system").push({text:`${u} hesabı silindi`});
+}
+
+/* ADMIN VIEW PASSWORDS */
+function adminPasswords(){
+  if(currentRole!=="admin") return;
+  db.ref("users").on("value",s=>{
+    adminView.innerHTML="<h4>Hesablar</h4>";
+    s.forEach(u=>{
+      adminView.innerHTML+=
+        `<div>${u.key} | ${u.val().password}</div>`;
+    });
+  });
+}
+
+/* CHAT */
 function sendMessage(){
   const t=msg.value.trim();
   if(!t) return;
@@ -156,7 +229,6 @@ function listenMessages(){
     d.className="msg";
     d.id=id;
     d.innerHTML=`<span>${m.user}: ${m.text}</span>`;
-
     if(m.user===currentUser||currentRole==="admin"){
       const tr=document.createElement("span");
       tr.className="trash";
@@ -166,11 +238,6 @@ function listenMessages(){
     }
     messages.appendChild(d);
     messages.scrollTop=messages.scrollHeight;
-  });
-
-  db.ref("messages").on("child_removed",s=>{
-    const el=document.getElementById(s.key);
-    if(el) el.remove();
   });
 }
 </script>
